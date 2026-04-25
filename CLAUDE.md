@@ -1,80 +1,90 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with
-code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands
 
 ```bash
-— Never run "npn run dev".
-- Use "npo run build" to check if code compiles or not. See results and fix code if it's needed
+npm run build     # Verify compilation (tsc -b + vite build) — use this to check for errors
 npm run lint      # Run ESLint
 npm run preview   # Preview production build
 ```
 
+**Never run `npm run dev`.**
+
+## Backend API
+
+Base URL: `https://notehub-public.goit.study/api/notes`  
+Docs: `https://notehub-public.goit.study/api/docs`
+
+Auth: `Authorization: Bearer <token>` header. Token comes from `VITE_NOTEHUB_TOKEN` env var — never hardcode it.
+
+Key endpoints:
+- `GET /api/notes?page=1&perPage=12&search=text` — paginated + filterable list
+- `POST /api/notes` — create note, returns created note
+- `DELETE /api/notes/:id` — delete note by ID, returns deleted note
+
+## Missing Dependencies (must install)
+
+These are required by the task but not yet in `package.json`:
+- `yup` — Formik schema validation
+- `use-debounce` — debounced search (`useDebouncedCallback`)
+
 ## Architecture
 
-**NoteHub** is a notes management SPA: React 19 + TypeScript + Vite, styled with
-CSS Modules, data fetching via TanStack React Query + Axios, form state via
-Formik, and pagination via react-paginate.
+**NoteHub** — notes CRUD SPA. Stack: React 19 + TypeScript + Vite + TanStack React Query + Axios + Formik + Yup + react-paginate + CSS Modules.
 
-The intended data flow mirrors the reference implementation in
-`../04-react-query`:
+**Data flow:**
+1. `App` holds `page` and `search` state. `useDebouncedCallback` (from `use-debounce`) wraps the search setter — use it in `App`, not in `SearchBox`.
+2. `useQuery` fetches notes via `fetchNotes({ page, search })`. TanStack Query manages all server state (fetching, caching, mutations).
+3. `useMutation` handles `createNote` and `deleteNote`; invalidate the notes query key on success.
+4. `NoteList` renders if `notes.length > 0`. `Pagination` renders if `totalPages > 1`.
+5. "Create note +" button opens `Modal` containing `NoteForm`. `Modal` closes on backdrop click or Escape key.
+6. `NoteForm` submits via `createNote` mutation, then closes the modal.
 
-1. `App` orchestrates all state: notes list, current page/search query, and
-   which note is selected for modal display.
-2. `useQuery` (React Query) drives note fetching; mutations use `useMutation` +
-   `queryClient.invalidateQueries` to keep the cache fresh.
-3. `noteService.ts` (in `src/services/`) contains the Axios calls — env var
-   `VITE_NOTEHUB_TOKEN` (or equivalent) for auth headers.
-4. `NoteList` renders the fetched notes; clicking a note card populates
-   `selectedNote` state and opens `Modal`.
-5. `Modal` is a `createPortal` to `document.body`. It accepts `onClose` and
-   renders `NoteForm` (or note detail) as children.
-6. `NoteForm` uses Formik with the `Note` types from `src/types/note.ts`; on
-   submit it calls the create/update service and closes the modal.
+## Type Locations
 
-## Key Types
+| Type | File |
+|---|---|
+| `Note`, `NoteTag` | `src/types/note.ts` |
+| `FetchNotesResponse`, request param types, Axios response types | `src/services/noteService.ts` |
+| `ComponentNameProps` interfaces | Inside each component file |
 
-```typescript
-// src/types/note.ts
-type NoteTag = 'Todo' | 'Work' | 'Personal' | 'Meeting' | 'Shopping';
+All event callbacks in component props must be explicitly typed. Use `interface` (not `type`) for props. Props interface naming: `ComponentNameProps`.
 
-interface Note {
-  id: number;
-  title: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-  tag: NoteTag;
-}
+## Form Validation (Yup schema in NoteForm)
+
+- `title`: required, min 3 chars, max 50 chars
+- `content`: optional, max 500 chars
+- `tag`: required, one of `Todo | Work | Personal | Meeting | Shopping`
+
+## Component Contracts
+
+**`Modal`** — generic wrapper; renders any `children`. Uses `createPortal` to `document.body`. DOM structure:
+```html
+<div class="backdrop" role="dialog" aria-modal="true">
+  <div class="modal">{children}</div>
+</div>
 ```
+Closes on backdrop click and Escape key.
 
-## Current Status (skeleton)
+**`SearchBox`** — renders a single `<input type="text" placeholder="Search notes" />`. Receives a callback prop; debouncing lives in `App` via `useDebouncedCallback`.
 
-The project structure is laid out but not yet wired together:
+**`Pagination`** — thin wrapper around `react-paginate`. Only renders when `totalPages > 1`. Note: react-paginate has a module format quirk in Vite 8+ — use a wrapper component (see `../04-react-query/src/components/Paginate/Pagination.tsx`).
 
-- `noteService.ts` — three empty stubs: `fetchNotes`, `createNote`, `deleteNote`
-- `App.tsx` — no state, no `useQuery`, no `QueryClientProvider` in `main.tsx`
-- `Modal.tsx` — portal shell with no props
-- `NoteForm.tsx` — Formik form with empty `initialValues` and `onSubmit`
-- `NoteList.tsx` — hardcoded mockup item, no mapping over real data
+**`NoteList`** — renders the `<ul>` list; only mounts when collection has ≥ 1 note. Delete button calls `deleteNote` mutation.
 
-## CSS Conventions
+## Conventions
 
-Each component has a co-located `.module.css` file. No global utility classes —
-layout is Flexbox/Grid per component. `modern-normalize` is imported in
-`main.tsx` via the module declaration in `declarations.d.ts`.
+- Each component lives in `src/components/<Name>/` with `<Name>.tsx` and `<Name>.module.css`.
+- All components use `export default`.
+- Shared entity types → `src/types/`. HTTP interfaces/params → `src/services/noteService.ts`. Props interfaces → component file.
+- CSS Modules only; no global utility classes. `modern-normalize` imported in `main.tsx`.
 
 ## Reference Implementation
 
-`../04-react-query` (movie search app) is the architectural template for this
-project. Refer to it for:
-
-- React Query `useQuery` wiring pattern (query key arrays, `enabled`,
-  `placeholderData: keepPreviousData`)
-- Modal Escape-key / backdrop-click close logic (see `MovieModal.tsx`)
-- Axios service layer pattern with typed responses (see `movieService.ts`)
-- Pagination integration with `react-paginate` (see `Pagination.tsx` wrapper —
-  needed due to module format quirk in Vite 8+)
-- Toast notifications with `react-hot-toast`
+`../04-react-query` (movie search app) demonstrates the same stack wired together. Refer to it for:
+- React Query `useQuery` / `useMutation` pattern with typed query keys
+- Modal Escape + backdrop close logic (`MovieModal.tsx`)
+- Axios service layer with typed request/response (`movieService.ts`)
+- react-paginate wrapper workaround (`Paginate/Pagination.tsx`)
