@@ -5,7 +5,7 @@ const api = axios.create({
   baseURL: 'https://notehub-public.goit.study/api',
   headers: {
     Accept: 'application/json',
-    Authorization: `Bearer ${import.meta.env.VITE_HOTEHUB_TOKEN}`,
+    Authorization: `Bearer ${import.meta.env.VITE_NOTEHUB_TOKEN}`,
   },
 });
 
@@ -42,7 +42,7 @@ export async function createNote(noteData: CreateNoteData): Promise<Note> {
   return data;
 }
 
-export async function deleteNote(id: number): Promise<Note> {
+export async function deleteNote(id: string): Promise<Note> {
   const { data } = await api.delete<Note>(`/notes/${id}`);
   return data;
 }

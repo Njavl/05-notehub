@@ -2,6 +2,7 @@
 .env*
 .claude*
 claude*
+review.txt
 
 # Logs
 logs

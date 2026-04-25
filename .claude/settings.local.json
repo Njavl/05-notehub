@@ -5,7 +5,8 @@
       "WebFetch(domain:notehub-public.goit.study)",
       "Bash(gh api *)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(xxd \"D:/GitHub/05-notehub/review.txt\")"
     ]
   }
 }
